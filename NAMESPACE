@@ -1,0 +1,5 @@
+useDynLib(regIRT, .registration=TRUE)
+importFrom(Rcpp, evalCpp)
+exportPattern("^[[:alpha:]]+")
+importFrom("graphics", "plot")
+importFrom("stats", "coef", "optim", "rnorm", "weights")
