@@ -3,10 +3,10 @@ Type: Package
 Title: Regularized estimation of IRT models
 Version: 1.0
 Date: 2018-11-02
-Author: Who wrote it
-Maintainer: Who to complain to <xxx@somewhere.net>
+Author: Michela Battauz
+Maintainer: Michela Battauz <michela.battauz@uniud.it>
 Description: Estimation of the nominal response model using a penalized likelihood approach.
 License: GPL-3
 Imports: Rcpp (>= 0.12.18), graphics, stats, nleqslv
-Suggests: Hmisc, Matrix, genlasso, mirt
+Suggests: Hmisc, Matrix, genlasso, mirt, statmod
 LinkingTo: Rcpp, RcppArmadillo
