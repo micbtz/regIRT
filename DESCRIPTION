@@ -1,8 +1,8 @@
 Package: regIRT
 Type: Package
 Title: Regularized estimation of IRT models
-Version: 1.0
-Date: 2018-11-02
+Version: 1.0.1
+Date: 2019-05-02
 Author: Michela Battauz
 Maintainer: Michela Battauz <michela.battauz@uniud.it>
 Description: Estimation of the nominal response model using a penalized likelihood approach.

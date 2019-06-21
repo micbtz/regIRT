@@ -9,7 +9,7 @@ sim_reg_nom<-function(r,n,param0,lambda,itmsel,cat0,nodes,weights,pen,adaptive)
   
   set.seed(r)
   abilities<-rnorm(n)
-  dataset<-simdata(param0,abilities)
+  dataset<-simdatanom(param0,abilities)
   # verify that there are all categories
   allcat<-sum(abs(apply(dataset,2,FUN=function(x) length(unique(x)))-cat0))==0
   if (allcat)

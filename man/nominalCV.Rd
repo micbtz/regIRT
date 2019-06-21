@@ -5,19 +5,17 @@
 Cross-validation of a nominal model with penalty
 }
 \usage{
-nominalCV(data, K, par, lambda, nodes, weights, items.select = 1:ncol(data), 
-pen, trace = FALSE, w)
-
+nominalCV(data, K, par, lambda, pen, adaptive, items.select = 1:ncol(data), nq,
+  trace = FALSE)
 }
 \arguments{
-\item{data}{dataset}
-\item{K}{number of folds}
-\item{par}{vector of parameters}
-\item{lambda}{tuning parameter}
-\item{nodes}{quadrature nodes}
-\item{weights}{quadrature weights}
-\item{items.select}{items with penalty}
-\item{pen}{"lasso" or "ridge"}
-\item{trace}{trace information}
-\item{w}{weights for adaptive penalty}
+\item{data}{Dataset.}
+\item{K}{Number of folds.}
+\item{par}{Vector of parameters.}
+\item{lambda}{Tuning parameter.}
+\item{pen}{Type of penalization: "lasso" or "ridge".}
+\item{adaptive}{Logical; if TRUE adaptive lasso is performed.}
+\item{items.select}{Items with penalty.}
+\item{nq}{Number of quadrature points.}
+\item{trace}{Trace information.}
 }

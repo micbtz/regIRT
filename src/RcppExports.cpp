@@ -7,36 +7,80 @@
 using namespace Rcpp;
 
 // nominallikRcppA
-arma::mat nominallikRcppA(arma::vec par, arma::mat data, arma::vec nodes, arma::vec weights, arma::mat numpatt, arma::uvec itemsselect, double lambda);
-RcppExport SEXP _regIRT_nominallikRcppA(SEXP parSEXP, SEXP dataSEXP, SEXP nodesSEXP, SEXP weightsSEXP, SEXP numpattSEXP, SEXP itemsselectSEXP, SEXP lambdaSEXP) {
+arma::mat nominallikRcppA(arma::vec par, arma::mat data, arma::mat nodes, arma::vec weights, arma::mat numpatt, arma::uvec itemsselect, int D, double lambda);
+RcppExport SEXP _regIRT_nominallikRcppA(SEXP parSEXP, SEXP dataSEXP, SEXP nodesSEXP, SEXP weightsSEXP, SEXP numpattSEXP, SEXP itemsselectSEXP, SEXP DSEXP, SEXP lambdaSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< arma::vec >::type par(parSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type data(dataSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type nodes(nodesSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type nodes(nodesSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type weights(weightsSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type numpatt(numpattSEXP);
     Rcpp::traits::input_parameter< arma::uvec >::type itemsselect(itemsselectSEXP);
+    Rcpp::traits::input_parameter< int >::type D(DSEXP);
     Rcpp::traits::input_parameter< double >::type lambda(lambdaSEXP);
-    rcpp_result_gen = Rcpp::wrap(nominallikRcppA(par, data, nodes, weights, numpatt, itemsselect, lambda));
+    rcpp_result_gen = Rcpp::wrap(nominallikRcppA(par, data, nodes, weights, numpatt, itemsselect, D, lambda));
     return rcpp_result_gen;
 END_RCPP
 }
 // gradnominallikRcppA
-arma::mat gradnominallikRcppA(arma::vec par, arma::mat data, arma::vec nodes, arma::vec weights, arma::mat numpatt, arma::uvec itemsselect, double lambda);
-RcppExport SEXP _regIRT_gradnominallikRcppA(SEXP parSEXP, SEXP dataSEXP, SEXP nodesSEXP, SEXP weightsSEXP, SEXP numpattSEXP, SEXP itemsselectSEXP, SEXP lambdaSEXP) {
+arma::mat gradnominallikRcppA(arma::vec par, arma::mat data, arma::mat nodes, arma::vec weights, arma::mat numpatt, arma::uvec itemsselect, int D, double lambda);
+RcppExport SEXP _regIRT_gradnominallikRcppA(SEXP parSEXP, SEXP dataSEXP, SEXP nodesSEXP, SEXP weightsSEXP, SEXP numpattSEXP, SEXP itemsselectSEXP, SEXP DSEXP, SEXP lambdaSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< arma::vec >::type par(parSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type data(dataSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type nodes(nodesSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type nodes(nodesSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type weights(weightsSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type numpatt(numpattSEXP);
     Rcpp::traits::input_parameter< arma::uvec >::type itemsselect(itemsselectSEXP);
+    Rcpp::traits::input_parameter< int >::type D(DSEXP);
     Rcpp::traits::input_parameter< double >::type lambda(lambdaSEXP);
-    rcpp_result_gen = Rcpp::wrap(gradnominallikRcppA(par, data, nodes, weights, numpatt, itemsselect, lambda));
+    rcpp_result_gen = Rcpp::wrap(gradnominallikRcppA(par, data, nodes, weights, numpatt, itemsselect, D, lambda));
+    return rcpp_result_gen;
+END_RCPP
+}
+// nominallik_fpenRcppA
+arma::mat nominallik_fpenRcppA(arma::vec par, arma::mat data, arma::mat nodes, arma::vec weights, arma::mat numpatt, arma::uvec itemsselect, List alphaW, bool adaptive, int D, double lambda, double eps);
+RcppExport SEXP _regIRT_nominallik_fpenRcppA(SEXP parSEXP, SEXP dataSEXP, SEXP nodesSEXP, SEXP weightsSEXP, SEXP numpattSEXP, SEXP itemsselectSEXP, SEXP alphaWSEXP, SEXP adaptiveSEXP, SEXP DSEXP, SEXP lambdaSEXP, SEXP epsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type par(parSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type data(dataSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type nodes(nodesSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type weights(weightsSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type numpatt(numpattSEXP);
+    Rcpp::traits::input_parameter< arma::uvec >::type itemsselect(itemsselectSEXP);
+    Rcpp::traits::input_parameter< List >::type alphaW(alphaWSEXP);
+    Rcpp::traits::input_parameter< bool >::type adaptive(adaptiveSEXP);
+    Rcpp::traits::input_parameter< int >::type D(DSEXP);
+    Rcpp::traits::input_parameter< double >::type lambda(lambdaSEXP);
+    Rcpp::traits::input_parameter< double >::type eps(epsSEXP);
+    rcpp_result_gen = Rcpp::wrap(nominallik_fpenRcppA(par, data, nodes, weights, numpatt, itemsselect, alphaW, adaptive, D, lambda, eps));
+    return rcpp_result_gen;
+END_RCPP
+}
+// gradnominallik_fpenRcppA
+arma::mat gradnominallik_fpenRcppA(arma::vec par, arma::mat data, arma::mat nodes, arma::vec weights, arma::mat numpatt, arma::uvec itemsselect, List alphaW, bool adaptive, int D, double lambda, double eps);
+RcppExport SEXP _regIRT_gradnominallik_fpenRcppA(SEXP parSEXP, SEXP dataSEXP, SEXP nodesSEXP, SEXP weightsSEXP, SEXP numpattSEXP, SEXP itemsselectSEXP, SEXP alphaWSEXP, SEXP adaptiveSEXP, SEXP DSEXP, SEXP lambdaSEXP, SEXP epsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type par(parSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type data(dataSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type nodes(nodesSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type weights(weightsSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type numpatt(numpattSEXP);
+    Rcpp::traits::input_parameter< arma::uvec >::type itemsselect(itemsselectSEXP);
+    Rcpp::traits::input_parameter< List >::type alphaW(alphaWSEXP);
+    Rcpp::traits::input_parameter< bool >::type adaptive(adaptiveSEXP);
+    Rcpp::traits::input_parameter< int >::type D(DSEXP);
+    Rcpp::traits::input_parameter< double >::type lambda(lambdaSEXP);
+    Rcpp::traits::input_parameter< double >::type eps(epsSEXP);
+    rcpp_result_gen = Rcpp::wrap(gradnominallik_fpenRcppA(par, data, nodes, weights, numpatt, itemsselect, alphaW, adaptive, D, lambda, eps));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -80,52 +124,14 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// nominallik_fpenRcppA
-arma::mat nominallik_fpenRcppA(arma::vec par, arma::mat data, arma::vec nodes, arma::vec weights, arma::mat numpatt, arma::uvec itemsselect, List w, double lambda, double eps);
-RcppExport SEXP _regIRT_nominallik_fpenRcppA(SEXP parSEXP, SEXP dataSEXP, SEXP nodesSEXP, SEXP weightsSEXP, SEXP numpattSEXP, SEXP itemsselectSEXP, SEXP wSEXP, SEXP lambdaSEXP, SEXP epsSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::vec >::type par(parSEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type data(dataSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type nodes(nodesSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type weights(weightsSEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type numpatt(numpattSEXP);
-    Rcpp::traits::input_parameter< arma::uvec >::type itemsselect(itemsselectSEXP);
-    Rcpp::traits::input_parameter< List >::type w(wSEXP);
-    Rcpp::traits::input_parameter< double >::type lambda(lambdaSEXP);
-    Rcpp::traits::input_parameter< double >::type eps(epsSEXP);
-    rcpp_result_gen = Rcpp::wrap(nominallik_fpenRcppA(par, data, nodes, weights, numpatt, itemsselect, w, lambda, eps));
-    return rcpp_result_gen;
-END_RCPP
-}
-// gradnominallik_fpenRcppA
-arma::mat gradnominallik_fpenRcppA(arma::vec par, arma::mat data, arma::vec nodes, arma::vec weights, arma::mat numpatt, arma::uvec itemsselect, List w, double lambda, double eps);
-RcppExport SEXP _regIRT_gradnominallik_fpenRcppA(SEXP parSEXP, SEXP dataSEXP, SEXP nodesSEXP, SEXP weightsSEXP, SEXP numpattSEXP, SEXP itemsselectSEXP, SEXP wSEXP, SEXP lambdaSEXP, SEXP epsSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::vec >::type par(parSEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type data(dataSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type nodes(nodesSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type weights(weightsSEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type numpatt(numpattSEXP);
-    Rcpp::traits::input_parameter< arma::uvec >::type itemsselect(itemsselectSEXP);
-    Rcpp::traits::input_parameter< List >::type w(wSEXP);
-    Rcpp::traits::input_parameter< double >::type lambda(lambdaSEXP);
-    Rcpp::traits::input_parameter< double >::type eps(epsSEXP);
-    rcpp_result_gen = Rcpp::wrap(gradnominallik_fpenRcppA(par, data, nodes, weights, numpatt, itemsselect, w, lambda, eps));
-    return rcpp_result_gen;
-END_RCPP
-}
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_regIRT_nominallikRcppA", (DL_FUNC) &_regIRT_nominallikRcppA, 7},
-    {"_regIRT_gradnominallikRcppA", (DL_FUNC) &_regIRT_gradnominallikRcppA, 7},
+    {"_regIRT_nominallikRcppA", (DL_FUNC) &_regIRT_nominallikRcppA, 8},
+    {"_regIRT_gradnominallikRcppA", (DL_FUNC) &_regIRT_gradnominallikRcppA, 8},
+    {"_regIRT_nominallik_fpenRcppA", (DL_FUNC) &_regIRT_nominallik_fpenRcppA, 11},
+    {"_regIRT_gradnominallik_fpenRcppA", (DL_FUNC) &_regIRT_gradnominallik_fpenRcppA, 11},
     {"_regIRT_nominallikaugRcppA", (DL_FUNC) &_regIRT_nominallikaugRcppA, 10},
     {"_regIRT_gradnominallikaugRcppA", (DL_FUNC) &_regIRT_gradnominallikaugRcppA, 10},
-    {"_regIRT_nominallik_fpenRcppA", (DL_FUNC) &_regIRT_nominallik_fpenRcppA, 9},
-    {"_regIRT_gradnominallik_fpenRcppA", (DL_FUNC) &_regIRT_gradnominallik_fpenRcppA, 9},
     {NULL, NULL, 0}
 };
 

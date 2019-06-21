@@ -55,6 +55,7 @@ nominallik<-function(par,data,lambda=0,nodes,weights)
 }
 
 
+# ridge penalty
 ridgepennominal<-function(param)
 {
   m<-length(param)
@@ -72,6 +73,7 @@ ridgepennominal<-function(param)
 }
 
 
+# derivative of ridge penalty
 derridgepennominal<-function(param)
 {
   m<-length(param)
@@ -86,8 +88,6 @@ derridgepennominal<-function(param)
   }
   out
 }
-
-
 
 
 # gradient of the likelihood of a nominal response model
@@ -156,6 +156,7 @@ gradnominallik<-function(par,data,lambda=0,nodes,weights)
 
 # responses start from zero
 # likelihood of a nominal response model + penalization
+# for ADMM algorithm
 nominallikaug<-function(par,data,lambda=0,nodes,weights,gamma,v,c,items.select=1:ncol(data))
 {
   n<-nrow(data)
@@ -189,7 +190,7 @@ nominallikaug<-function(par,data,lambda=0,nodes,weights,gamma,v,c,items.select=1
 
 
 
-
+# function for ADMM algorithm
 aug_lagr_pen<-function(param,gamma,v,c)
 {
   m<-length(param)
@@ -280,7 +281,8 @@ der_aug_lagr_pen<-function(param,gamma,v,c)
 }
 
 
-# likelihood of a nominal response model
+
+# likelihood of a nominal response model with fused lasso penalty on slope parameters
 # responses start from zero
 # lasso penalty approximated with quadratic approximation
 nominallik_fpen<-function(par,data,lambda=0,nodes,weights,items.select=1:ncol(data),eps=0.001,w)
@@ -317,6 +319,7 @@ nominallik_fpen<-function(par,data,lambda=0,nodes,weights,items.select=1:ncol(da
 }
 
 
+# fused lasso penalty on slope parameters of the nominal model
 fpen<-function(param,eps,w)
 {
   m<-length(param)
@@ -331,7 +334,7 @@ fpen<-function(param,eps,w)
 }
 
 
-# gradient of the likelihood of a nominal response model
+# gradient of the likelihood of a nominal response model with fused lasso penalty on slope parameters
 gradnominallik_fpen<-function(par,data,lambda=0,nodes,weights,items.select=1:ncol(data),eps=0.001,w)
 {
   patterns<-apply(data,1,paste, collapse ="_")
@@ -395,7 +398,7 @@ gradnominallik_fpen<-function(par,data,lambda=0,nodes,weights,items.select=1:nco
 }
 
 
-# derivative of group fused penalization
+# derivative of fused penalization
 derfpen<-function(param,eps,w)
 {
   m<-length(param)
@@ -417,32 +420,130 @@ derfpen<-function(param,eps,w)
 }
 
 
-
+# approximation of abs function
 approxabs<-function(x,eps) sqrt(x^2+eps)
 
 
 
+# estimation of the parameters of a nominal model
+# with optional penalty on the slope parameters
+nominalmod<-function(data,par,lambda=0,pen=NULL,adaptive=NULL,items.select=1:ncol(data),nq=61)
+{
+  nitems<-ncol(data)
 
+  if (any(lambda>0) & is.null(pen)) stop("specify argument pen if lambda>0")
+  if (pen=="lasso" & is.null(adaptive)) stop("speficy argument adaptive if pen='lasso'")   
+  
+  # check that the lowest category is zero
+  mincat<-apply(data,2,min,na.rm=TRUE)
+  if (!all(mincat==0))
+  { 
+    warning("categories have been rescaled to start from zero")
+    for (j in 1:nitems) data[,j]<-data[,j]-mincat[j]
+  }
+  # check that categories have consecutive numbers
+  maxcat<-apply(data,2,max,na.rm=TRUE)
+  ncat<-apply(data,2,FUN=function(x) sum(!is.na(unique(x))))
+  for (j in 1:nitems)
+  {
+    if(maxcat[j]+1 != ncat[j])
+    {
+      warning("catetories have been rescaled to have consecutive numbers")
+      tmp<-as.factor(data[,j])
+      levels(tmp)<-0:(ncat[j]-1)
+      data[,j]<-as.numeric(tmp)
+    }
+  }
+  
+  gq<-statmod::gauss.quad.prob(n=nq,dist="normal")
+  nodes<-gq$nodes
+  weights<-gq$weights
+  
+  rdata<-reduce_data(data)
+  datared<-rdata$data
+  numpatt<-rdata$numpatt
+  datared[is.na(datared)]<- -999
+  
+  #ncat<-apply(data,2,max,na.rm=TRUE)+1
+  ind<-unlist(lapply(as.list(1:nitems),FUN=function(x,ncat) rep(x,each=(ncat[x]-1)*2),ncat=ncat))
+  param<-split(par,ind)
+  
+  if (pen=="lasso") {
+    w<-list()
+    for(j in 1:nitems) {
+      m<-length(param[[j]])/2
+      if (adaptive)
+      {
+        alpha<-c(0,param[[j]][1:m])
+        w[[j]]<-1/abs(outer(alpha,alpha,"-"))
+      }
+      else w[[j]]<-matrix(1,m+1,m+1)
+    }
+  }
+  parout<-c()
+  lik<-c()
+  conv<-c()
+  nlambda<-length(lambda)
+  for (l in 1:nlambda)
+  {
+    if (l==1) ini<-par
+    else ini<-parout[l-1]
+    if (lambda[l]==0)
+      opt<-optim(par=par,fn=nominallikRcppA,gr=gradnominallikRcppA,method="BFGS",
+                 data=datared,nodes=nodes,weights=weights,lambda=0,numpatt=numpatt,
+                 itemsselect=items.select-1,control=list(maxit=500))
+    
+    if (lambda[l]>0)
+    {
+      if (pen=="ridge")
+        opt<-optim(par=par,fn=nominallikRcppA,gr=gradnominallikRcppA,method="BFGS",
+                   data=datared,nodes=nodes,weights=weights,lambda=lambda[l],numpatt=numpatt,
+                   itemsselect=items.select-1,control=list(maxit=500))
+  
+      if (pen=="lasso")
+      {
+        opt<-optim(par=par,fn=nominallik_fpenRcppA,gr=gradnominallik_fpenRcppA,data=datared,
+                   method="BFGS",lambda=lambda[l],nodes=nodes,weights=weights,numpatt=numpatt,
+                   itemsselect=items.select-1,control=list(maxit=500),eps=0.01,w=w)
+        for (i in 3:9) 
+          opt<-optim(par=par,fn=nominallik_fpenRcppA,gr=gradnominallik_fpenRcppA,data=datared,
+                     method="BFGS",lambda=lambda[l],nodes=nodes,weights=weights,numpatt=numpatt,
+                     itemsselect=items.select-1,control=list(maxit=500),eps=10^-i,w=w)
+      }
+    }
+    parout<-cbind(parout,opt$par)
+    lik<-c(lik,-opt$value)
+    conv<-c(conv,opt$convergence)
+  }
+
+  return(list(par=parout, lik=lik, convergence=conv))
+
+}
+
+
+
+
+# initial values (for ADMM algorithm)
 vinit<-function(gamma,lambda)
 {
   -lambda*sign(gamma)
 }
 
 
-
+# returns unique patterns of responses and relative frequencies
 reduce_data<-function(data)
 {
   patterns<-apply(data,1,paste, collapse ="_")
   tab<-table(patterns)
   first_patt<-!duplicated(patterns)
-  datared<-data[first_patt,]
+  datared<-as.matrix(data[first_patt,])
   patterns_unique<-patterns[first_patt]
   numpatt<-as.matrix(tab[patterns_unique])
   return(list(data=datared,numpatt=numpatt))
 }
 
 
-# optimization through augmented lagrangian 
+# optimization through augmented lagrangian (ADMM algorithm) 
 nominal_grfused<-function(par,data,maxiter=1000,maxiter_innerloop=100,v=NULL,cinit,lambda,items.select=1:ncol(data),nodes,weights)
 {
   rdata<-reduce_data(data)
@@ -562,7 +663,7 @@ nominal_grfused<-function(par,data,maxiter=1000,maxiter_innerloop=100,v=NULL,cin
 }
 
 
-
+# reparameterization of the parameters of the nominal model from mirt to regIRT package
 repar<-function(param)
 {
   discrm<-param[1]
@@ -624,6 +725,7 @@ nominal_proxgr<-function(par,datared,nodes,weights,numpatt,lambda,s,w)
 }
 
 
+# function for proximal gradient
 w2W<-function(w)
 {
   out<-c()
@@ -639,11 +741,33 @@ w2W<-function(w)
 
 
 # cross-validation
-nominalCV<-function(data,K,par,lambda,nodes,weights,items.select=1:ncol(data),pen,trace=FALSE,w)
+nominalCV<-function(data,K,par,lambda,pen,adaptive,items.select=1:ncol(data),nq,trace=FALSE)
 {
   n<-nrow(data)
   nitems<-ncol(data)
   categ<-apply(data,2,FUN=function(x) sort(unique(x)))
+  
+  gq<-statmod::gauss.quad.prob(n=nq,dist="normal")
+  nodes<-gq$nodes
+  weights<-gq$weights
+  
+  ncat<-apply(data,2,FUN=function(x) sum(!is.na(unique(x))))
+  ind<-unlist(lapply(as.list(1:nitems),FUN=function(x,ncat) rep(x,each=(ncat[x]-1)*2),ncat=ncat))
+  param<-split(par,ind)
+  
+  if (pen=="lasso") {
+    w<-list()
+    for(j in 1:nitems) {
+      m<-length(param[[j]])/2
+      if (adaptive)
+      {
+        alpha<-c(0,param[[j]][1:m])
+        w[[j]]<-1/abs(outer(alpha,alpha,"-"))
+      }
+      else w[[j]]<-matrix(1,m+1,m+1)
+    }
+  }
+  
   
   cond<-TRUE
   count<-0
@@ -734,10 +858,13 @@ nominalCV<-function(data,K,par,lambda,nodes,weights,items.select=1:ncol(data),pe
 
 
 
-
+# generate data from a nominal model
 simdata<-function(param,abilities)
 {
   probs<- lapply(param, FUN=nomprobs, nodes=abilities)
   sapply(probs,FUN=function(x) Hmisc::rMultinom(probs=t(x), m=1)-1)
 }
+
+
+
 
