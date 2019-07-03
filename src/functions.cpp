@@ -63,7 +63,6 @@ arma::vec derridgepennominal(arma::vec param, int D)
 }
 
 
-// yes
 // [[Rcpp::export]]
 arma::mat nominallikRcppA(arma::vec par, arma::mat data, arma::mat nodes, 
                           arma::vec weights, arma::mat numpatt,
@@ -118,7 +117,6 @@ arma::mat nominallikRcppA(arma::vec par, arma::mat data, arma::mat nodes,
 
 
 
-// yes
 // [[Rcpp::export]]
 arma::mat gradnominallikRcppA(arma::vec par, arma::mat data, arma::mat nodes, 
                               arma::vec weights, arma::mat numpatt, 
@@ -266,7 +264,6 @@ arma::vec derfpen(arma::vec param, double eps, arma::mat alphaW, int D, bool ada
 }
 
 
-//yes
 // [[Rcpp::export]]
 arma::mat nominallik_fpenRcppA(arma::vec par, arma::mat data, arma::mat nodes, 
                                arma::vec weights, arma::mat numpatt, 
@@ -321,7 +318,6 @@ arma::mat nominallik_fpenRcppA(arma::vec par, arma::mat data, arma::mat nodes,
 }
 
 
-// yes
 // [[Rcpp::export]]
 arma::mat gradnominallik_fpenRcppA(arma::vec par, arma::mat data, arma::mat nodes, 
                               arma::vec weights, arma::mat numpatt, 
@@ -453,7 +449,6 @@ arma::vec der_aug_lagr_pen(arma::vec param, arma::mat gamma, arma::mat v, double
 
 
 
-// yes
 // [[Rcpp::export]]
 arma::mat nominallikaugRcppA(arma::vec par, arma::mat data, arma::vec nodes, 
                              arma::vec weights, List gamma, List v, 
@@ -509,7 +504,6 @@ arma::mat nominallikaugRcppA(arma::vec par, arma::mat data, arma::vec nodes,
 }
 
 
-// yes
 // [[Rcpp::export]]
 arma::mat gradnominallikaugRcppA(arma::vec par, arma::mat data, arma::vec nodes, arma::vec weights, 
                                  List gamma, List v, double c, arma::mat numpatt, 

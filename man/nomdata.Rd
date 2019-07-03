@@ -5,7 +5,7 @@
 	Nominal response data
 }
 \description{
-	Simulated data set with polytomous responses on 4 items.
+	Simulated data with polytomous responses on 4 items.
 }
 \usage{
 data(nomdata)

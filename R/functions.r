@@ -1,20 +1,34 @@
 
 # probabilities of a nominal model
-nomprobs<-function(param,nodes)
+nomprobs<-function(param,nodes,D)
 {
-  m<-length(param)
-  alpha<-param[1:(m/2)] # thresholds
-  beta<-param[(m/2+1):m] # discriminations
-  pr<-exp(outer(alpha,nodes)+beta)
-  pr<-rbind(1,pr)
+  #m<-length(param)
+  param<-matrix(param,ncol=D+1)
+  param<-rbind(0,param)
+  alpha<-subset(param,select=1:D) # discriminations
+  beta<-param[,D+1] # thresholds
+  pr<-exp(alpha%*%t(nodes)+beta)
+  #pr<-exp(outer(alpha,nodes)+beta)
+  #pr<-rbind(1,pr)
   t(t(pr)/colSums(pr))
 }
 
 
+par2list<-function(par,data,D)
+{
+  nitems<-ncol(data)
+  ncat<-apply(data,2,max,na.rm=TRUE)+1
+  ind<-unlist(lapply(as.list(1:nitems),FUN=function(x,ncat) rep(x,each=(ncat[x]-1)*(D+1)),ncat=ncat))
+  param<-split(par,ind)
+  names(param)<-colnames(data)
+  param
+}
+
 # data responses should start from zero and have consecutive numbers
 # likelihood of a nominal response model
 # responses start from zero
-nominallik<-function(par,data,lambda=0,nodes,weights)
+# if D>1 (more than 1 dimension) nodes and weights are matrices obtained from expand.grid; weights contains the product of the elements
+nominallik<-function(par,data,D=1,lambda=0,nodes,weights)
 {
   patterns<-apply(data,1,paste, collapse ="_")
   tab<-table(patterns)
@@ -24,15 +38,16 @@ nominallik<-function(par,data,lambda=0,nodes,weights)
   numpatt<-as.vector(tab[patterns_unique])
 
   n<-nrow(datared)
-  nq<-length(nodes)
+  #nq<-length(nodes)
+  param<-par2list(par=par,data=datared,D=D)
   nitems<-ncol(datared)
-  ncat<-apply(datared,2,max,na.rm=TRUE)+1
-  ind<-unlist(lapply(as.list(1:nitems),FUN=function(x,ncat) rep(x,each=(ncat[x]-1)*2),ncat=ncat))
-  param<-split(par,ind)
+  # ncat<-apply(datared,2,max,na.rm=TRUE)+1
+  # ind<-unlist(lapply(as.list(1:nitems),FUN=function(x,ncat) rep(x,each=(ncat[x]-1)*(D+1)),ncat=ncat))
+  # param<-split(par,ind)
 
-  probs<- lapply(param, FUN=nomprobs, nodes=nodes)
+  probs<- lapply(param, FUN=nomprobs, nodes=nodes, D=D)
   logprobs<-lapply(probs,log)
-  logprodj <- matrix(0, n, nq)
+  logprodj <- matrix(0, n, nrow(nodes))
   for (j in 1:nitems) {
     logprobsj <- logprobs[[j]]
     xj <- datared[, j]
@@ -48,7 +63,7 @@ nominallik<-function(par,data,lambda=0,nodes,weights)
 
   pen<-0
   if (lambda>0)
-    pen<-sum(sapply(param,FUN=ridgepennominal)) # ridge-type penalization
+    pen<-sum(sapply(param,FUN=ridgepennominal,D=D)) # ridge-type penalization
   out <- mlik + lambda * pen
   #print(out)
   out
@@ -56,17 +71,21 @@ nominallik<-function(par,data,lambda=0,nodes,weights)
 
 
 # ridge penalty
-ridgepennominal<-function(param)
+ridgepennominal<-function(param,D)
 {
-  m<-length(param)
-  alpha<-param[1:(m/2)] # thresholds
-  beta<-param[(m/2+1):m] # discriminations
+  param<-matrix(param,ncol=D+1)
+  param<-rbind(0,param)
+  alpha<-subset(param,select=1:D) # discriminations
   out<-0
-  for (k in 1:(m/2-1))
+  m<-nrow(param)
+  for (d in 1:D)
   {
-    for (h in (k+1):m/2)
+    for (k in 1:(m-1))
     {
-      out<-out+(alpha[k]-alpha[h])^2
+      for (h in (k+1):m)
+      {
+        out<-out+(alpha[k,d]-alpha[h,d])^2
+      }
     }
   }
   out
@@ -74,24 +93,29 @@ ridgepennominal<-function(param)
 
 
 # derivative of ridge penalty
-derridgepennominal<-function(param)
+derridgepennominal<-function(param,D)
 {
-  m<-length(param)
-  alpha<-param[1:(m/2)] # thresholds
-  out<-rep(0,m)
-  for (k in 1:(m/2))
+  param<-matrix(param,ncol=D+1)
+  param<-rbind(0,param)
+  alpha<-subset(param,select=1:D) # discriminations
+  m<-nrow(param)
+  out<-matrix(0,m,D+1)
+  for (d in 1:D)
   {
-    for (h in 1:(m/2))
+    for (k in 1:m)
     {
-      out[k]<- out[k]+2*(alpha[k]-alpha[h])
+      for (h in 1:m)
+      {
+        out[k,d]<- out[k,d]+2*(alpha[k,d]-alpha[h,d])
+      }
     }
   }
-  out
+  matrix(out[-1,],ncol=1)
 }
 
 
 # gradient of the likelihood of a nominal response model
-gradnominallik<-function(par,data,lambda=0,nodes,weights)
+gradnominallik<-function(par,data,D=1,lambda=0,nodes,weights)
 {
   patterns<-apply(data,1,paste, collapse ="_")
   tab<-table(patterns)
@@ -101,12 +125,13 @@ gradnominallik<-function(par,data,lambda=0,nodes,weights)
   numpatt<-as.vector(tab[patterns_unique])
   
   n<-nrow(datared)
-  nq<-length(nodes)
+  nq<-nrow(as.matrix(nodes))
   nitems<-ncol(datared)
   ncat<-apply(datared,2,max,na.rm=TRUE)+1
-  ind<-unlist(lapply(as.list(1:nitems),FUN=function(x,ncat) rep(x,each=(ncat[x]-1)*2),ncat=ncat))
-  param<-split(par,ind)
-  probs<- lapply(param, FUN=nomprobs, nodes=nodes)
+  # ind<-unlist(lapply(as.list(1:nitems),FUN=function(x,ncat) rep(x,each=(ncat[x]-1)*(D+1)),ncat=ncat))
+  # param<-split(par,ind)
+  param<-par2list(par=par,data=datared,D=D)
+  probs<- lapply(param, FUN=nomprobs, nodes=nodes, D=D)
   logprobs<-lapply(probs,log)
 
   logpr <- array(0, c(n, nq, nitems))
@@ -135,22 +160,197 @@ gradnominallik<-function(par,data,lambda=0,nodes,weights)
       #derprob[xj!=k,]<- -probs_xj[xj!=k,]*matrix(probs[[j]][k+1,],nrow=1)[rep(1,sum(xj!=k)),]
       if (any(na.ind)) derprob[na.ind, ] <- 0
       sumq_numerator <- ((prodmj*derprob) %*% weights)
-      der[k+ncat[j]-1+sum(ncat[0:(j-1)]-1)*2]<-sum(sumq_numerator/sumq*numpatt) #thresholds
+      der[k+(ncat[j]-1)*D+sum(ncat[0:(j-1)]-1)*(D+1)]<-sum(sumq_numerator/sumq*numpatt) #thresholds
 
-      derprob<-  derprob*rep(nodes,each=n)
-      sumq_numerator <- ((prodmj*derprob) %*% weights)
-      der[k+sum(ncat[0:(j-1)]-1)*2]<-sum(sumq_numerator/sumq*numpatt) #discriminations
-
+      for (d in 1:D)
+      {
+        derprob_alphad<-  derprob*rep(nodes[,d],each=n)
+        sumq_numerator <- ((prodmj*derprob_alphad) %*% weights)
+        der[k+(ncat[j]-1)*(d-1)+sum(ncat[0:(j-1)]-1)*(D+1)]<-sum(sumq_numerator/sumq*numpatt) #discriminations
+      }
     }
   }
 
   # penalization
   derpen<-0
   if (lambda>0)
-    derpen<-unlist(lapply(param,FUN=derridgepennominal)) # ridge-type penalization
+    derpen<-unlist(lapply(param,FUN=derridgepennominal,D=D)) # ridge-type penalization
   out <- der - lambda * derpen
   -out # derivatives of minus log-likelihood
 }
+
+
+
+
+# likelihood of a nominal response model with fused lasso penalty on slope parameters
+# responses start from zero
+# lasso penalty approximated with quadratic approximation
+nominallik_fpen<-function(par,data,D=1,lambda=0,nodes,weights,items.select=1:ncol(data),eps=0.001,alphaW)
+{
+  patterns<-apply(data,1,paste, collapse ="_")
+  tab<-table(patterns)
+  first_patt<-!duplicated(patterns)
+  datared<-data[first_patt,]
+  patterns_unique<-patterns[first_patt]
+  numpatt<-as.vector(tab[patterns_unique])
+  
+  n<-nrow(datared)
+  #nq<-length(nodes)
+  nitems<-ncol(datared)
+  # ncat<-apply(datared,2,max,na.rm=TRUE)+1
+  # ind<-unlist(lapply(as.list(1:nitems),FUN=function(x,ncat) rep(x,each=(ncat[x]-1)*(D+1)),ncat=ncat))
+  # param<-split(par,ind)
+  param<-par2list(par=par,data=datared,D=D)
+  
+  probs<- lapply(param, FUN=nomprobs, nodes=nodes, D=D)
+  logprobs<-lapply(probs,log)
+  logprodj <- matrix(0, n, nrow(nodes))
+  for (j in 1:nitems) {
+    logprobsj <- logprobs[[j]]
+    xj <- datared[, j]
+    na.ind <- is.na(xj)
+    logprobsj <- logprobsj[xj+1, ]
+    if (any(na.ind))
+      logprobsj[na.ind, ] <- 0
+    logprodj <- logprodj + logprobsj
+  }
+  prodj<-exp(logprodj)
+  sumq <- (prodj %*% weights)
+  mlik <- -sum(log(sumq)*numpatt) # minus log-likelihood
+  
+  pen<-0
+  if (lambda>0)
+    pen<-sum(mapply(fpen,param=param[items.select],alphaW=alphaW[items.select],eps=eps,D=D))
+  out <- mlik + lambda * pen
+  #print(out)
+  out
+}
+
+
+# fused lasso penalty on slope parameters of the nominal model
+fpen<-function(param,eps,alphaW,D)
+{
+  param<-matrix(param,ncol=D+1)
+  param<-rbind(0,param)
+  alpha<-subset(param,select=1:D) # discriminations
+  out<-0
+  m<-nrow(param)
+  for (d in 1:D)
+  {
+    for (k in 1:(m-1))
+    {
+      for (h in (k+1):m)
+      {
+        if (is.null(alphaW)) out<-out+approxabs(alpha[k,d]-alpha[h,d],eps=eps)
+        else out<-out+approxabs(alpha[k,d]-alpha[h,d],eps=eps)/abs(alphaW[k,d]-alphaW[h,d])
+      }
+    }
+  }
+  out
+}
+
+# derivative of fused penalization
+derfpen<-function(param,eps,alphaW,D)
+{
+  param<-matrix(param,ncol=D+1)
+  param<-rbind(0,param)
+  alpha<-subset(param,select=1:D) # discriminations
+  m<-nrow(param)
+  ind<-1:m
+  out<-matrix(0,m,D+1)
+  for (d in 1:D)
+  {
+    for (g in 1:m) {
+      for (k in ind[ind<g]) {
+        absa<-approxabs(alpha[k,d]-alpha[g,d],eps)
+        if (is.null(alphaW)) w<-1
+        else w<-abs(alphaW[k,d]-alphaW[g,d])
+        out[g,d]<-out[g,d]-(alpha[k,d]-alpha[g,d])/absa/w
+      }
+      for (h in ind[ind>g]) {
+        absa<-approxabs(alpha[g,d]-alpha[h,d],eps)
+        if (is.null(alphaW)) w<-1
+        else w<-abs(alphaW[g,d]-alphaW[h,d])
+        out[g,d]<-out[g,d]+(alpha[g,d]-alpha[h,d])/absa/w
+      }
+    }
+  }
+  matrix(out[-1,],ncol=1)
+}
+
+
+# gradient of the likelihood of a nominal response model with fused lasso penalty on slope parameters
+gradnominallik_fpen<-function(par,data,D=1,lambda=0,nodes,weights,items.select=1:ncol(data),eps=0.001,alphaW)
+{
+  patterns<-apply(data,1,paste, collapse ="_")
+  tab<-table(patterns)
+  first_patt<-!duplicated(patterns)
+  datared<-data[first_patt,]
+  patterns_unique<-patterns[first_patt]
+  numpatt<-as.vector(tab[patterns_unique])
+  
+  n<-nrow(datared)
+  nq<-nrow(as.matrix(nodes))
+  nitems<-ncol(datared)
+  ncat<-apply(datared,2,max,na.rm=TRUE)+1
+  # ind<-unlist(lapply(as.list(1:nitems),FUN=function(x,ncat) rep(x,each=(ncat[x]-1)*(D+1)),ncat=ncat))
+  # param<-split(par,ind)
+  param<-par2list(par=par,data=datared,D=D)
+  probs<- lapply(param, FUN=nomprobs, nodes=nodes, D=D)
+  logprobs<-lapply(probs,log)
+  
+  logpr <- array(0, c(n, nq, nitems))
+  for (j in 1:nitems) {
+    logprobsj <- logprobs[[j]]
+    xj <- datared[, j]
+    na.ind <- is.na(xj)
+    logprobsj <- logprobsj[xj+1, ]
+    if (any(na.ind)) logprobsj[na.ind, ] <- 0
+    logpr[,,j] <- logprobsj
+  }
+  prodj<-exp(apply(logpr,c(1,2),sum))
+  sumq <- (prodj %*% weights)
+  der<-matrix(0,length(par),1)
+  for (j in 1:nitems) {
+    logprbis<-logpr
+    logprbis[,,j]<-0
+    prodmj<-exp(apply(logprbis,c(1,2),sum)) #prod over items without item j
+    xj <- datared[, j]
+    na.ind <- is.na(xj)
+    for (k in 1:(ncat[j]-1)) { # loop through threshold parameters
+      probs_xj<-probs[[j]][xj+1,]
+      derprob<-matrix(NA,n,nq)
+      derprob[xj==k & !is.na(xj),]<-  probs_xj[xj==k & !is.na(xj),]*(1-probs_xj[xj==k & !is.na(xj),])
+      derprob[xj!=k & !is.na(xj),]<- -probs_xj[xj!=k & !is.na(xj),]*rep(probs[[j]][k+1,],each=sum(xj!=k & !is.na(xj)))
+      #derprob[xj!=k,]<- -probs_xj[xj!=k,]*matrix(probs[[j]][k+1,],nrow=1)[rep(1,sum(xj!=k)),]
+      if (any(na.ind)) derprob[na.ind, ] <- 0
+      sumq_numerator <- ((prodmj*derprob) %*% weights)
+      der[k+(ncat[j]-1)*D+sum(ncat[0:(j-1)]-1)*(D+1)]<-sum(sumq_numerator/sumq*numpatt) #thresholds
+      
+      for (d in 1:D)
+      {
+        derprob_alphad<-  derprob*rep(nodes[,d],each=n)
+        sumq_numerator <- ((prodmj*derprob_alphad) %*% weights)
+        der[k+(ncat[j]-1)*(d-1)+sum(ncat[0:(j-1)]-1)*(D+1)]<-sum(sumq_numerator/sumq*numpatt) #discriminations
+      }
+    }
+  }
+  
+  # penalization
+  if (lambda>0)
+    for (j in items.select) {
+      derpen<-derfpen(param[[j]],eps=eps,alphaW=alphaW[[j]],D)
+      der[(sum((ncat[0:(j-1)]-1)*(D+1))+1) : (sum((ncat[0:j]-1)*(D+1))) ]<-der[(sum((ncat[0:(j-1)]-1)*(D+1))+1) : (sum((ncat[0:j]-1)*(D+1))) ] - lambda * derpen
+    }
+  -der # derivatives of minus log-likelihood
+}
+
+
+
+
+# approximation of abs function
+approxabs<-function(x,eps) sqrt(x^2+eps)
+
 
 
 
@@ -162,9 +362,10 @@ nominallikaug<-function(par,data,lambda=0,nodes,weights,gamma,v,c,items.select=1
   n<-nrow(data)
   nq<-length(nodes)
   nitems<-ncol(data)
-  ncat<-apply(data,2,max,na.rm=TRUE)+1
-  ind<-unlist(lapply(as.list(1:nitems),FUN=function(x,ncat) rep(x,each=(ncat[x]-1)*2),ncat=ncat))
-  param<-split(par,ind)
+  # ncat<-apply(data,2,max,na.rm=TRUE)+1
+  # ind<-unlist(lapply(as.list(1:nitems),FUN=function(x,ncat) rep(x,each=(ncat[x]-1)*2),ncat=ncat))
+  # param<-split(par,ind)
+  param<-par2list(par=par,data=data,D=1)
   
   probs<- lapply(param, FUN=nomprobs, nodes=nodes)
   logprobs<-lapply(probs,log)
@@ -210,8 +411,9 @@ gradnominallikaug<-function(par,data,lambda=0,nodes,weights,gamma,v,c,items.sele
   nq<-length(nodes)
   nitems<-ncol(data)
   ncat<-apply(data,2,max,na.rm=TRUE)+1
-  ind<-unlist(lapply(as.list(1:nitems),FUN=function(x,ncat) rep(x,each=(ncat[x]-1)*2),ncat=ncat))
-  param<-split(par,ind)
+  # ind<-unlist(lapply(as.list(1:nitems),FUN=function(x,ncat) rep(x,each=(ncat[x]-1)*2),ncat=ncat))
+  # param<-split(par,ind)
+  param<-par2list(par=par,data=data,D=1)
   probs<- lapply(param, FUN=nomprobs, nodes=nodes)
   logprobs<-lapply(probs,log)
 
@@ -282,157 +484,21 @@ der_aug_lagr_pen<-function(param,gamma,v,c)
 
 
 
-# likelihood of a nominal response model with fused lasso penalty on slope parameters
-# responses start from zero
-# lasso penalty approximated with quadratic approximation
-nominallik_fpen<-function(par,data,lambda=0,nodes,weights,items.select=1:ncol(data),eps=0.001,w)
-{
-  n<-nrow(data)
-  nq<-length(nodes)
-  nitems<-ncol(data)
-  ncat<-apply(data,2,max,na.rm=TRUE)+1
-  ind<-unlist(lapply(as.list(1:nitems),FUN=function(x,ncat) rep(x,each=(ncat[x]-1)*2),ncat=ncat))
-  param<-split(par,ind)
-
-  probs<- lapply(param, FUN=nomprobs, nodes=nodes)
-  logprobs<-lapply(probs,log)
-  logprodj <- matrix(0, n, nq)
-  for (j in 1:nitems) {
-    logprobsj <- logprobs[[j]]
-    xj <- data[, j]
-    na.ind <- is.na(xj)
-    logprobsj <- logprobsj[xj+1, ]
-    if (any(na.ind))
-      logprobsj[na.ind, ] <- 0
-    logprodj <- logprodj + logprobsj
-  }
-  prodj<-exp(logprodj)
-  sumq <- (prodj %*% weights)
-  mlik <- -sum(log(sumq)) # minus log-likelihood
-  
-  pen<-0
-  if (lambda>0)
-    pen<-sum(mapply(fpen,param=param[items.select],w=w[items.select],eps=eps))
-  out <- mlik + lambda * pen
-  #print(out)
-  out
-}
-
-
-# fused lasso penalty on slope parameters of the nominal model
-fpen<-function(param,eps,w)
-{
-  m<-length(param)
-  alpha<-c(0,param[1:(m/2)])
-  out<-0
-  for (k in 1:(m/2)) {
-    for (h in (k+1):(m/2+1)) {
-      out<-out+approxabs(alpha[k]-alpha[h],eps=eps)*w[k,h]
-    }
-  }
-  out
-}
-
-
-# gradient of the likelihood of a nominal response model with fused lasso penalty on slope parameters
-gradnominallik_fpen<-function(par,data,lambda=0,nodes,weights,items.select=1:ncol(data),eps=0.001,w)
-{
-  patterns<-apply(data,1,paste, collapse ="_")
-  tab<-table(patterns)
-  first_patt<-!duplicated(patterns)
-  datared<-data[first_patt,]
-  patterns_unique<-patterns[first_patt]
-  numpatt<-as.vector(tab[patterns_unique])
-  
-  n<-nrow(datared)
-  nq<-length(nodes)
-  nitems<-ncol(datared)
-  ncat<-apply(datared,2,max,na.rm=TRUE)+1
-  ind<-unlist(lapply(as.list(1:nitems),FUN=function(x,ncat) rep(x,each=(ncat[x]-1)*2),ncat=ncat))
-  param<-split(par,ind)
-  probs<- lapply(param, FUN=nomprobs, nodes=nodes)
-  logprobs<-lapply(probs,log)
-  
-  logpr <- array(0, c(n, nq, nitems))
-  for (j in 1:nitems) {
-    logprobsj <- logprobs[[j]]
-    xj <- datared[, j]
-    na.ind <- is.na(xj)
-    logprobsj <- logprobsj[xj+1, ]
-    if (any(na.ind)) logprobsj[na.ind, ] <- 0
-    logpr[,,j] <- logprobsj
-  }
-  prodj<-exp(apply(logpr,c(1,2),sum))
-  sumq <- (prodj %*% weights)
-  der<-matrix(0,length(par),1)
-  for (j in 1:nitems) {
-    logprbis<-logpr
-    logprbis[,,j]<-0
-    prodmj<-exp(apply(logprbis,c(1,2),sum)) #prod over items without item j
-    xj <- datared[, j]
-    na.ind <- is.na(xj)
-    for (k in 1:(ncat[j]-1)) { # loop through threshold parameters
-      probs_xj<-probs[[j]][xj+1,]
-      derprob<-matrix(NA,n,nq)
-      derprob[xj==k & !is.na(xj),]<-  probs_xj[xj==k & !is.na(xj),]*(1-probs_xj[xj==k & !is.na(xj),])
-      derprob[xj!=k & !is.na(xj),]<- -probs_xj[xj!=k & !is.na(xj),]*rep(probs[[j]][k+1,],each=sum(xj!=k & !is.na(xj)))
-      #derprob[xj!=k,]<- -probs_xj[xj!=k,]*matrix(probs[[j]][k+1,],nrow=1)[rep(1,sum(xj!=k)),]
-      if (any(na.ind)) derprob[na.ind, ] <- 0
-      sumq_numerator <- ((prodmj*derprob) %*% weights)
-      der[k+ncat[j]-1+sum(ncat[0:(j-1)]-1)*2]<-sum(sumq_numerator/sumq*numpatt) #thresholds
-      
-      derprob<-  derprob*rep(nodes,each=n)
-      sumq_numerator <- ((prodmj*derprob) %*% weights)
-      der[k+sum(ncat[0:(j-1)]-1)*2]<-sum(sumq_numerator/sumq*numpatt) #discriminations
-      
-    }
-  }
-  
-  # penalization
-  if (lambda>0)
-    for (j in items.select) {
-      derpen<-derfpen(param[[j]],eps=eps,w=w[[j]])
-      der[(sum((ncat[0:(j-1)]-1)*2)+1) : (sum((ncat[0:j]-1)*2)) ]<-der[(sum((ncat[0:(j-1)]-1)*2)+1) : (sum((ncat[0:j]-1)*2)) ] - lambda * derpen
-    }
-  -der # derivatives of minus log-likelihood
-}
-
-
-# derivative of fused penalization
-derfpen<-function(param,eps,w)
-{
-  m<-length(param)
-  ind<-1:(m/2+1)
-  alpha<-c(0,param[1:(m/2)])
-  # beta<-c(0,param[(m/2+1):m])
-  out<-rep(0,m)
-  for (g in 2:(m/2+1)) {
-      for (k in ind[ind<g]) {
-        absa<-approxabs(alpha[k]-alpha[g],eps)
-        out[g-1]<-out[g-1]-(alpha[k]-alpha[g])/absa*w[k,g]
-      }
-      for (h in ind[ind>g]) {
-        absa<-approxabs(alpha[g]-alpha[h],eps)
-        out[g-1]<-out[g-1]+(alpha[g]-alpha[h])/absa*w[g,h]
-      }
-  }
-  out
-}
-
-
-# approximation of abs function
-approxabs<-function(x,eps) sqrt(x^2+eps)
 
 
 
 # estimation of the parameters of a nominal model
 # with optional penalty on the slope parameters
-nominalmod<-function(data,par,lambda=0,pen=NULL,adaptive=NULL,items.select=1:ncol(data),nq=61)
+nominalmod<-function(data,D=1,parini,parW=NULL,lambda=0,pen=NULL,adaptive=NULL,items.select=1:ncol(data),nq=NULL)
 {
+  # if (is.vector(parW)) parW<-matrix(parW)
+  # if (pen=="lasso" & adaptive)
+  #   if (ncol(parW)!=length(lambda)) stop("the number of columns of parW should be equal to the length of lambda")
+  
   nitems<-ncol(data)
 
   if (any(lambda>0) & is.null(pen)) stop("specify argument pen if lambda>0")
-  if (pen=="lasso" & is.null(adaptive)) stop("speficy argument adaptive if pen='lasso'")   
+  if (!is.null(pen)) if (pen=="lasso" & is.null(adaptive)) stop("speficy argument adaptive if pen='lasso'")   
   
   # check that the lowest category is zero
   mincat<-apply(data,2,min,na.rm=TRUE)
@@ -451,64 +517,84 @@ nominalmod<-function(data,par,lambda=0,pen=NULL,adaptive=NULL,items.select=1:nco
       warning("catetories have been rescaled to have consecutive numbers")
       tmp<-as.factor(data[,j])
       levels(tmp)<-0:(ncat[j]-1)
-      data[,j]<-as.numeric(tmp)
+      data[,j]<-as.numeric(as.character(tmp))
     }
   }
   
-  gq<-statmod::gauss.quad.prob(n=nq,dist="normal")
-  nodes<-gq$nodes
-  weights<-gq$weights
+  if (is.null(nq)) nq<-switch(as.character(D), '1'=61, '2'=31, '3'=15, '4'=9, '5'=7, 3)
   
+  gq<-statmod::gauss.quad.prob(n=nq,dist="normal")
+  nodes<-matrix(gq$nodes)
+  weights<-gq$weights
+  nodes_list<-c()
+  for (d in 1:D) nodes_list[[d]]<-nodes
+  nodes<-as.matrix(expand.grid(nodes_list))
+  weights_list<-c()
+  for (d in 1:D) weights_list[[d]]<-weights
+  weights<-as.matrix(expand.grid(weights_list))
+  weights<-apply(weights,1,prod)
+  
+  # ncat<-apply(data,2,FUN=function(x) sum(!is.na(unique(x))))
+  # ind<-unlist(lapply(as.list(1:nitems),FUN=function(x,ncat) rep(x,each=(ncat[x]-1)*(D+1)),ncat=ncat))
+
   rdata<-reduce_data(data)
   datared<-rdata$data
   numpatt<-rdata$numpatt
   datared[is.na(datared)]<- -999
   
-  #ncat<-apply(data,2,max,na.rm=TRUE)+1
-  ind<-unlist(lapply(as.list(1:nitems),FUN=function(x,ncat) rep(x,each=(ncat[x]-1)*2),ncat=ncat))
-  param<-split(par,ind)
-  
-  if (pen=="lasso") {
-    w<-list()
-    for(j in 1:nitems) {
-      m<-length(param[[j]])/2
+  if (!is.null(pen))
+  {
+    if (pen=="lasso")
+    {
       if (adaptive)
       {
-        alpha<-c(0,param[[j]][1:m])
-        w[[j]]<-1/abs(outer(alpha,alpha,"-"))
+        paramW<-par2list(par=parW,data=datared,D=D)
+        #paramW<-split(parW,ind)
+        alphaW<-vector("list",nitems)
+        for(j in 1:nitems) {
+          paramj<-matrix(paramW[[j]],ncol=D+1)
+          paramj<-rbind(0,paramj)
+          alphaj<-subset(paramj,select=1:D) # discriminations
+          alphaW[[j]]<-alphaj
+        }
       }
-      else w[[j]]<-matrix(1,m+1,m+1)
+      else {
+        alphaW<-vector("list",nitems)
+        for (i in 1:nitems) alphaW[[i]]<-matrix(1,1,1)
+      }
     }
   }
+  
   parout<-c()
   lik<-c()
   conv<-c()
   nlambda<-length(lambda)
   for (l in 1:nlambda)
   {
-    if (l==1) ini<-par
-    else ini<-parout[l-1]
+    cat("lambda =", lambda[l],"\n")
+    if (l==1) ini<-parini
+    else ini<-parout[,l-1]
     if (lambda[l]==0)
-      opt<-optim(par=par,fn=nominallikRcppA,gr=gradnominallikRcppA,method="BFGS",
-                 data=datared,nodes=nodes,weights=weights,lambda=0,numpatt=numpatt,
+      opt<-optim(par=ini,fn=nominallikRcppA,gr=gradnominallikRcppA,method="BFGS",
+                 data=datared,D=D,nodes=nodes,weights=weights,lambda=0,numpatt=numpatt,
                  itemsselect=items.select-1,control=list(maxit=500))
     
     if (lambda[l]>0)
     {
       if (pen=="ridge")
-        opt<-optim(par=par,fn=nominallikRcppA,gr=gradnominallikRcppA,method="BFGS",
-                   data=datared,nodes=nodes,weights=weights,lambda=lambda[l],numpatt=numpatt,
+        opt<-optim(par=ini,fn=nominallikRcppA,gr=gradnominallikRcppA,method="BFGS",
+                   data=datared,D=D,nodes=nodes,weights=weights,lambda=lambda[l],numpatt=numpatt,
                    itemsselect=items.select-1,control=list(maxit=500))
   
       if (pen=="lasso")
       {
-        opt<-optim(par=par,fn=nominallik_fpenRcppA,gr=gradnominallik_fpenRcppA,data=datared,
+        opt<-optim(par=ini,fn=nominallik_fpenRcppA,gr=gradnominallik_fpenRcppA,data=datared,D=D,
                    method="BFGS",lambda=lambda[l],nodes=nodes,weights=weights,numpatt=numpatt,
-                   itemsselect=items.select-1,control=list(maxit=500),eps=0.01,w=w)
+                   itemsselect=items.select-1,control=list(maxit=500),eps=0.01,alphaW=alphaW,adaptive=adaptive)
         for (i in 3:9) 
-          opt<-optim(par=par,fn=nominallik_fpenRcppA,gr=gradnominallik_fpenRcppA,data=datared,
+          opt<-optim(par=ini,fn=nominallik_fpenRcppA,gr=gradnominallik_fpenRcppA,data=datared,D=D,
                      method="BFGS",lambda=lambda[l],nodes=nodes,weights=weights,numpatt=numpatt,
-                     itemsselect=items.select-1,control=list(maxit=500),eps=10^-i,w=w)
+                     itemsselect=items.select-1,control=list(maxit=500),eps=10^-i,alphaW=alphaW,adaptive=adaptive)
       }
     }
     parout<-cbind(parout,opt$par)
@@ -516,8 +602,137 @@ nominalmod<-function(data,par,lambda=0,pen=NULL,adaptive=NULL,items.select=1:nco
     conv<-c(conv,opt$convergence)
   }
 
-  return(list(par=parout, lik=lik, convergence=conv))
+  return(list(data=data, D=D, parini=parini, parW=parW, lambda=lambda, pen=pen, adaptive=adaptive, items.select=items.select, nq=nq, par=parout, lik=lik, convergence=conv))
 
+}
+
+# cross-validation
+nominalCV<-function(object,K,trace=FALSE)
+{
+  data<-object$data
+  D<-object$D
+  parini<-object$parini
+  parW<-object$parW
+  lambda<-object$lambda
+  pen<-object$pen
+  adaptive<-object$adaptive
+  items.select<-object$items.select
+  nq<-object$nq
+  
+  n<-nrow(data)
+  nitems<-ncol(data)
+  categ<-apply(data,2,FUN=function(x) sort(unique(x)))
+  
+  if (is.null(nq)) nq<-switch(as.character(D), '1'=61, '2'=31, '3'=15, '4'=9, '5'=7, 3)
+
+  gq<-statmod::gauss.quad.prob(n=nq,dist="normal")
+  nodes<-matrix(gq$nodes)
+  weights<-gq$weights
+  nodes_list<-c()
+  for (d in 1:D) nodes_list[[d]]<-nodes
+  nodes<-as.matrix(expand.grid(nodes_list))
+  weights_list<-c()
+  for (d in 1:D) weights_list[[d]]<-weights
+  weights<-as.matrix(expand.grid(weights_list))
+  weights<-apply(weights,1,prod)
+  
+  # ncat<-apply(data,2,FUN=function(x) sum(!is.na(unique(x))))
+  # ind<-unlist(lapply(as.list(1:nitems),FUN=function(x,ncat) rep(x,each=(ncat[x]-1)*(D+1)),ncat=ncat))
+
+  if (pen=="lasso") {
+    if (adaptive)
+    {
+      paramW<-par2list(par=parW,data=data,D=D)
+      # paramW<-split(parW,ind)
+      alphaW<-vector("list",nitems)
+      for(j in 1:nitems) {
+        paramj<-matrix(paramW[[j]],ncol=D+1)
+        paramj<-rbind(0,paramj)
+        alphaj<-subset(paramj,select=1:D) # discriminations
+        alphaW[[j]]<-alphaj
+      }
+    }
+    else {
+      alphaW<-vector("list",nitems)
+      for (i in 1:nitems) alphaW[[i]]<-matrix(1,1,1)
+    }
+  }
+  
+  cond<-TRUE
+  count<-0
+  while (cond){ # repeat until all groups have all categories
+    gr <- split(sample(n, n, replace=FALSE), as.factor(1:K)) # generation of subsets for CROSS-VALIDATION
+    datared<-vector("list",K)
+    cond1k<-rep(TRUE,K)
+    for (k in 1:K) # k = subset
+    {
+      data_k<-data[-gr[[k]],] # training set
+      rdata_k<-reduce_data(data_k)
+      rdata_k$data[is.na(rdata_k$data)]<- -999
+      datared[[k]]$training<-rdata_k
+      datak<-data[gr[[k]],] # validation set
+      rdatak<-reduce_data(datak)
+      rdatak$data[is.na(rdatak$data)]<- -999
+      datared[[k]]$validation<-rdatak
+      categ_trk<-apply(datared[[k]]$training$data,2,FUN=function(x) sort(unique(x[x!= -999])))
+      # categ_valk<-apply(datared[[k]]$validation$data,2,FUN=function(x) sort(unique(x)))
+      if (identical(categ,categ_trk)) cond1k[k]<-FALSE
+    }
+    cond<-any(cond1k)
+    count<-count+1
+    if (count==100) cond<-FALSE
+  }
+  if(count<100)
+  {
+    # ===============================
+    # not penalized
+    # ===============================
+    
+    est_nopen<-matrix(NA,K,length(parini))
+    lik_nopen<-rep(NA,K)
+    
+    for (k in 1:K) # k = subset
+    {
+      if (trace) print(k)
+      o<-optim(par=parini,fn=nominallikRcppA,gr=gradnominallikRcppA,method="BFGS",data=datared[[k]]$training$data,D=D,nodes=nodes,weights=weights,numpatt=datared[[k]]$training$numpatt,itemsselect=items.select-1,control=list(maxit=500))
+      est_nopen[k,]<-o$par
+      lik_nopen[k]<-nominallikRcppA(par=o$par,data=datared[[k]]$validation$data,D=D,nodes=nodes,weights=weights,numpatt=datared[[k]]$validation$numpatt,itemsselect=items.select-1)
+    }
+    
+    # ===============================
+    # penalized
+    # ===============================
+    
+    est_pen<-vector("list",length(lambda)) # estimates
+    lik_pen<-vector("list",length(lambda)) # likelihood
+    
+    for (i in 1:length(lambda)) {
+      est_pen[[i]]<-matrix(NA,K,length(parini))
+      lik_pen[[i]]<-rep(NA,K)
+      for (k in 1:K) # k = subset
+      {
+        if (trace) print(c(i,k))
+        if (i>1) ini<-est_pen[[i-1]][k,]
+        if (i==1) ini<-est_nopen[k,]
+        if (pen=="lasso")
+        {
+          opt<-optim(par=ini,fn=nominallik_fpenRcppA,gr=gradnominallik_fpenRcppA,data=datared[[k]]$training$data,D=D,method="BFGS",lambda=lambda[i],nodes=nodes,weights=weights,numpatt=datared[[k]]$training$numpatt,itemsselect=items.select-1,control=list(maxit=500),eps=0.01,alphaW=alphaW,adaptive=adaptive)
+          for (e in 3:10) opt<-optim(par=opt$par, fn=nominallik_fpenRcppA,gr=gradnominallik_fpenRcppA,data=datared[[k]]$training$data,D=D,method="BFGS",lambda=lambda[i],nodes=nodes,weights=weights,numpatt=datared[[k]]$training$numpatt,itemsselect=items.select-1,control=list(maxit=500),eps=10^-e,alphaW=alphaW,adaptive=adaptive)
+        }
+        if (pen=="ridge")
+        {
+          opt<-optim(par=ini,fn=nominallikRcppA,gr=gradnominallikRcppA,data=datared[[k]]$training$data,D=D,method="BFGS",nodes=nodes,weights=weights,lambda=lambda[i],numpatt=datared[[k]]$training$numpatt,itemsselect=items.select-1,control=list(maxit=500))
+        }
+        est_pen[[i]][k,]<-opt$par
+        lik_pen[[i]][k]<-nominallikRcppA(par=opt$par,data=datared[[k]]$validation$data,D=D,nodes=nodes,weights=weights,numpatt=datared[[k]]$validation$numpatt,itemsselect=items.select-1)
+      }
+    }
+    # select the maximum likelihood
+    sel<-which.min(sapply(lik_pen,mean))
+  }
+  else est_pen<-lik_pen<-sel<-NULL
+  
+  return(list(est=est_pen,lik=lik_pen,lambda=lambda,sel=sel,lambdasel=lambda[sel],par=object$par,data=data,D=D))
 }
 
 
@@ -664,13 +879,12 @@ nominal_grfused<-function(par,data,maxiter=1000,maxiter_innerloop=100,v=NULL,cin
 
 
 # reparameterization of the parameters of the nominal model from mirt to regIRT package
-repar<-function(param)
+repar<-function(param,D=1)
 {
-  discrm<-param[1]
-  param<-param[-1]
+  discrm<-param[1:D]
+  param<-param[-(1:D)]
   m<-length(param)/2
-  param[1:m]<-param[1:m]*discrm
-  param[-c(1,m+1)]
+  c(as.vector(outer(param[2:m],discrm)),param[2:m+m])
 }
 
 
@@ -740,130 +954,35 @@ w2W<-function(w)
 
 
 
-# cross-validation
-nominalCV<-function(data,K,par,lambda,pen,adaptive,items.select=1:ncol(data),nq,trace=FALSE)
-{
-  n<-nrow(data)
-  nitems<-ncol(data)
-  categ<-apply(data,2,FUN=function(x) sort(unique(x)))
-  
-  gq<-statmod::gauss.quad.prob(n=nq,dist="normal")
-  nodes<-gq$nodes
-  weights<-gq$weights
-  
-  ncat<-apply(data,2,FUN=function(x) sum(!is.na(unique(x))))
-  ind<-unlist(lapply(as.list(1:nitems),FUN=function(x,ncat) rep(x,each=(ncat[x]-1)*2),ncat=ncat))
-  param<-split(par,ind)
-  
-  if (pen=="lasso") {
-    w<-list()
-    for(j in 1:nitems) {
-      m<-length(param[[j]])/2
-      if (adaptive)
-      {
-        alpha<-c(0,param[[j]][1:m])
-        w[[j]]<-1/abs(outer(alpha,alpha,"-"))
-      }
-      else w[[j]]<-matrix(1,m+1,m+1)
-    }
-  }
-  
-  
-  cond<-TRUE
-  count<-0
-  while (cond){ # repeat until all groups have all categories
-    gr <- split(sample(n, n, replace=FALSE), as.factor(1:K)) # generation of subsets for CROSS-VALIDATION
-    datared<-vector("list",K)
-    cond1k<-rep(TRUE,K)
-    for (k in 1:K) # k = subset
-    {
-      data_k<-data[-gr[[k]],] # training set
-      rdata_k<-reduce_data(data_k)
-      rdata_k$data[is.na(rdata_k$data)]<- -999
-      datared[[k]]$training<-rdata_k
-      datak<-data[gr[[k]],] # validation set
-      rdatak<-reduce_data(datak)
-      rdatak$data[is.na(rdatak$data)]<- -999
-      datared[[k]]$validation<-rdatak
-      categ_trk<-apply(datared[[k]]$training$data,2,FUN=function(x) sort(unique(x[x!= -999])))
-      # categ_valk<-apply(datared[[k]]$validation$data,2,FUN=function(x) sort(unique(x)))
-      if (identical(categ,categ_trk)) cond1k[k]<-FALSE
-    }
-    cond<-any(cond1k)
-    count<-count+1
-    if (count==100) cond<-FALSE
-  }
-  if(count<100)
-  {
-    # ===============================
-    # not penalized
-    # ===============================
-    
-    est_nopen<-matrix(NA,K,length(par))
-    lik_nopen<-rep(NA,K)
-    
-    for (k in 1:K) # k = subset
-    {
-      if (trace) print(k)
-      o<-optim(par=par,fn=nominallikRcppA,gr=gradnominallikRcppA,method="BFGS",data=datared[[k]]$training$data,nodes=nodes,weights=weights,numpatt=datared[[k]]$training$numpatt,itemsselect=items.select-1,control=list(maxit=500))
-      est_nopen[k,]<-o$par
-      lik_nopen[k]<-nominallikRcppA(par=o$par,data=datared[[k]]$validation$data,nodes=nodes,weights=weights,numpatt=datared[[k]]$validation$numpatt,itemsselect=items.select-1)
-    }
-    
-    # ===============================
-    # penalized
-    # ===============================
-    
-    est_pen<-vector("list",length(lambda)) # estimates
-    lik_pen<-vector("list",length(lambda)) # likelihood
-    
-    for (i in 1:length(lambda)) {
-      est_pen[[i]]<-matrix(NA,K,length(par))
-      lik_pen[[i]]<-rep(NA,K)
-      for (k in 1:K) # k = subset
-      {
-        if (trace) print(c(i,k))
-        if (i>1) ini<-est_pen[[i-1]][k,]
-        if (i==1) ini<-est_nopen[k,]
-        if (pen=="lasso")
-        {
-          opt<-optim(par=ini,fn=nominallik_fpenRcppA,gr=gradnominallik_fpenRcppA,data=datared[[k]]$training$data,method="BFGS",lambda=lambda[i],nodes=nodes,weights=weights,numpatt=datared[[k]]$training$numpatt,itemsselect=items.select-1,control=list(maxit=500),eps=0.01,w=w)
-          for (e in 3:10) opt<-optim(par=opt$par, fn=nominallik_fpenRcppA,gr=gradnominallik_fpenRcppA,data=datared[[k]]$training$data,method="BFGS",lambda=lambda[i],nodes=nodes,weights=weights,numpatt=datared[[k]]$training$numpatt,itemsselect=items.select-1,control=list(maxit=500),eps=10^-e,w=w)
-        }
-        if (pen=="ridge")
-        {
-          opt<-optim(par=ini,fn=nominallikRcppA,gr=gradnominallikRcppA,data=datared[[k]]$training$data,method="BFGS",nodes=nodes,weights=weights,lambda=lambda[i],numpatt=datared[[k]]$training$numpatt,itemsselect=items.select-1,control=list(maxit=500))
-        }
-        est_pen[[i]][k,]<-opt$par
-        lik_pen[[i]][k]<-nominallikRcppA(par=opt$par,data=datared[[k]]$validation$data,nodes=nodes,weights=weights,numpatt=datared[[k]]$validation$numpatt,itemsselect=items.select-1)
-      }
-    }
-    # select the maximum likelihood
-    sel<-which.min(sapply(lik_pen,mean))
-    # estimate the model with selected lambda using all data
-    # rdata<-reduce_data(data)
-    # datared<-rdata$data
-    # numpatt<-rdata$numpatt
-    # datared[is.na(datared)]<- -999
-    # 
-    # opt<-optim(par=par,fn=nominallik_fpenRcppA,gr=gradnominallik_fpenRcppA,data=datared,method="BFGS",lambda=lambda[sel],nodes=nodes,weights=weights,numpatt=numpatt,itemsselect=items.select-1,control=list(maxit=500),eps=0.01)
-    # for (e in 3:10) opt<-optim(par=opt$par, fn=nominallik_fpenRcppA,gr=gradnominallik_fpenRcppA,data=datared,method="BFGS",lambda=lambda[sel],nodes=nodes,weights=weights,numpatt=numpatt,itemsselect=items.select-1,control=list(maxit=500),eps=10^-e)
-    
-    fin_est<-NULL #opt$par
-  }
-  else est_pen<-lik_pen<-fin_est<-sel<-NULL
-  
-  return(list(est=est_pen,lik=lik_pen,lambda=lambda,fin_est=fin_est,sel=sel))
-}
-
-
-
 # generate data from a nominal model
-simdata<-function(param,abilities)
+simdatanom<-function(param,abilities,D)
 {
-  probs<- lapply(param, FUN=nomprobs, nodes=abilities)
+  probs<- lapply(param, FUN=nomprobs, nodes=abilities,D=D)
   sapply(probs,FUN=function(x) Hmisc::rMultinom(probs=t(x), m=1)-1)
 }
+
+
+# regularization path
+regPath<-function(cvres)
+{
+  data<-cvres$data
+  D<-cvres$D
+  lambda<-cvres$lambda
+  nitems<-ncol(data)
+  ncat<-apply(data,2,max)+1
+  npar<-ncat-1
+  ind<-unlist(lapply(as.list(1:nitems),FUN=function(x,ncat) rep(x,each=(ncat[x]-1)*(D+1)),ncat=ncat))
+  for (j in 1:nitems)
+  {
+    outj<-cvres$par[ind==j,]
+    cl<-rep(1:(D+1),each=nrow(outj)/(D+1))
+    plot(lambda,outj[1,],type="l",ylim=c(min(outj),max(outj)),xlab=expression(lambda),ylab="",main=colnames(data)[j])
+    abline(v=cvres$lambdasel)
+    for (i in 1:sum(ind==j))
+      lines(lambda,outj[i,],col=cl[i])
+  }
+}
+
 
 
 
